@@ -48,6 +48,7 @@ void __fastcall CustomDraw(void* pApp, void* edx) {
     }
 
     // --- The True Omni-Buzzsaw Fix ---
+    // todo: this doesnt do anything, please remove and check that nothing broke
     static float visualTickAccumulator = 0.0f;
     float fpsCorrection = 64.0f / (float)targetFps;
     visualTickAccumulator += fpsCorrection;

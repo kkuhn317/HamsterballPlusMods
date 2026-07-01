@@ -1,9 +1,13 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
-VisualStudioVersion = 17.14.37411.7 d17.14
+VisualStudioVersion = 17.14.37411.7
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "FPS_Unlocker", "FPS_Unlocker\FPS_Unlocker.vcxproj", "{102AF6BF-94E4-42D6-A454-2FADCBEBB7ED}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "PlayerColorCustomization", "PlayerColorCustomization\PlayerColorCustomization.vcxproj", "{690B4083-A74D-4DD9-A816-C882F9375A79}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "GravityMod", "GravityMod\GravityMod.vcxproj", "{F7BFB399-9B13-4874-837E-EC9B1068BC0B}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -21,6 +25,22 @@ Global
 		{102AF6BF-94E4-42D6-A454-2FADCBEBB7ED}.Release|x64.Build.0 = Release|x64
 		{102AF6BF-94E4-42D6-A454-2FADCBEBB7ED}.Release|x86.ActiveCfg = Release|Win32
 		{102AF6BF-94E4-42D6-A454-2FADCBEBB7ED}.Release|x86.Build.0 = Release|Win32
+		{690B4083-A74D-4DD9-A816-C882F9375A79}.Debug|x64.ActiveCfg = Debug|x64
+		{690B4083-A74D-4DD9-A816-C882F9375A79}.Debug|x64.Build.0 = Debug|x64
+		{690B4083-A74D-4DD9-A816-C882F9375A79}.Debug|x86.ActiveCfg = Debug|Win32
+		{690B4083-A74D-4DD9-A816-C882F9375A79}.Debug|x86.Build.0 = Debug|Win32
+		{690B4083-A74D-4DD9-A816-C882F9375A79}.Release|x64.ActiveCfg = Release|x64
+		{690B4083-A74D-4DD9-A816-C882F9375A79}.Release|x64.Build.0 = Release|x64
+		{690B4083-A74D-4DD9-A816-C882F9375A79}.Release|x86.ActiveCfg = Release|Win32
+		{690B4083-A74D-4DD9-A816-C882F9375A79}.Release|x86.Build.0 = Release|Win32
+		{F7BFB399-9B13-4874-837E-EC9B1068BC0B}.Debug|x64.ActiveCfg = Debug|x64
+		{F7BFB399-9B13-4874-837E-EC9B1068BC0B}.Debug|x64.Build.0 = Debug|x64
+		{F7BFB399-9B13-4874-837E-EC9B1068BC0B}.Debug|x86.ActiveCfg = Debug|Win32
+		{F7BFB399-9B13-4874-837E-EC9B1068BC0B}.Debug|x86.Build.0 = Debug|Win32
+		{F7BFB399-9B13-4874-837E-EC9B1068BC0B}.Release|x64.ActiveCfg = Release|x64
+		{F7BFB399-9B13-4874-837E-EC9B1068BC0B}.Release|x64.Build.0 = Release|x64
+		{F7BFB399-9B13-4874-837E-EC9B1068BC0B}.Release|x86.ActiveCfg = Release|Win32
+		{F7BFB399-9B13-4874-837E-EC9B1068BC0B}.Release|x86.Build.0 = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
