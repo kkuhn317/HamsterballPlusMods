@@ -10,24 +10,96 @@ static constexpr DWORD BOARD_VTABLE_MAX = 0x4D2000;
 static constexpr DWORD GLOBAL_APP_PTR = 0x5341E0;
 
 static constexpr DWORD AB_P1_R = 0x421BFD, AB_P1_G = 0x421BF8, AB_P1_B = 0x421BF3, AB_P1_A = 0x421BEE;
-static constexpr DWORD AB_P2_G = 0x421CBB, AB_P2_B = 0x421CB6, AB_P2_A = 0x421CB1; // P2_R = EBX
+static constexpr DWORD AB_P2_G = 0x421CBB, AB_P2_B = 0x421CB6, AB_P2_A = 0x421CB1;
 static constexpr DWORD AB_P3_R = 0x421D85, AB_P3_G = 0x421D80, AB_P3_B = 0x421D7B, AB_P3_A = 0x421D76;
-static constexpr DWORD AB_P4_R = 0x421E4A, AB_P4_G = 0x421E45, AB_P4_A = 0x421E3F; // P4_B = EBX
+static constexpr DWORD AB_P4_R = 0x421E4A, AB_P4_A = 0x421E3F;
 
 static constexpr DWORD ALS_P1_R_2P = 0x433116, ALS_P1_G_2P = 0x433111, ALS_P1_B_2P = 0x43310C, ALS_P1_A_2P = 0x433107;
-static constexpr DWORD ALS_P1_R_4P = 0x43321F, ALS_P1_G_4P = 0x43321A, ALS_P1_B_4P = 0x433215, ALS_P1_A_4P = 0x433210;
-static constexpr DWORD ALS_P2_G = 0x433025, ALS_P2_B = 0x433020; // P2_R = EBX
+static constexpr DWORD ALS_P2_G = 0x433025, ALS_P2_B = 0x433020;
 static constexpr DWORD ALS_P3_R = 0x433063, ALS_P3_G = 0x43305E, ALS_P3_B = 0x433059;
-static constexpr DWORD ALS_P4_R = 0x43309C, ALS_P4_G = 0x433097; // P4_B = EBX
+static constexpr DWORD ALS_P4_R = 0x43309C;
 
 static constexpr DWORD DM_P1_R = 0x431B3C, DM_P1_G = 0x431B37, DM_P1_B = 0x431B32, DM_P1_A = 0x431B2D;
-static constexpr DWORD DM_P2_G = 0x431B6E, DM_P2_B = 0x431B69, DM_P2_A = 0x431B64; // P2_R = EBX
+static constexpr DWORD DM_P2_G = 0x431B6E, DM_P2_B = 0x431B69, DM_P2_A = 0x431B64;
+
+static float g_p2_red = 0.0f;
+static float g_p4_blue = 0.0f;
+static float g_p4_green = 1.0f;
+
+enum SavedType { SAVED_CALL, SAVED_LEA, SAVED_PUSH_GLOBAL };
+struct CodeCave { void* caveAddr; };
+static CodeCave g_caves[5];
+
+static void installCave(int idx, DWORD patchSite, float* globalFloat,
+    SavedType savedType, DWORD callTarget, BYTE leaOffset,
+    float* secondGlobal, DWORD returnAddr) {
+    BYTE caveCode[32];
+    int p = 0;
+
+    caveCode[p++] = 0xFF;
+    caveCode[p++] = 0x35;
+    *(DWORD*)(caveCode + p) = (DWORD)globalFloat;
+    p += 4;
+
+    int savedLen;
+    if (savedType == SAVED_CALL) {
+        savedLen = 5;
+        caveCode[p++] = 0xE8;
+        *(DWORD*)(caveCode + p) = 0;
+        p += 4;
+    }
+    else if (savedType == SAVED_LEA) {
+        savedLen = 4;
+        caveCode[p++] = 0x8D;
+        caveCode[p++] = 0x4C;
+        caveCode[p++] = 0x24;
+        caveCode[p++] = leaOffset;
+    }
+    else {
+        savedLen = 5;
+        caveCode[p++] = 0xFF;
+        caveCode[p++] = 0x35;
+        *(DWORD*)(caveCode + p) = (DWORD)secondGlobal;
+        p += 4;
+    }
+
+    int jmpOffset = p;
+    caveCode[p++] = 0xE9;
+    *(DWORD*)(caveCode + p) = 0;
+    p += 4;
+    int totalLen = p;
+
+    void* cave = VirtualAlloc(NULL, 4096, MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE);
+    if (!cave) return;
+    g_caves[idx].caveAddr = cave;
+    memcpy(cave, caveCode, totalLen);
+
+    DWORD caveBase = (DWORD)cave;
+
+    if (savedType == SAVED_CALL) {
+        DWORD callAddr = caveBase + 6;
+        *(DWORD*)(caveBase + 7) = callTarget - (callAddr + 5);
+    }
+
+    DWORD jmpSrc = caveBase + jmpOffset;
+    *(DWORD*)(caveBase + jmpOffset + 1) = returnAddr - (jmpSrc + 5);
+
+    int patchLen = (savedLen == 4) ? 5 : 6;
+    DWORD oldProtect;
+    VirtualProtect((void*)patchSite, patchLen, PAGE_EXECUTE_READWRITE, &oldProtect);
+    *(BYTE*)(patchSite) = 0xE9;
+    *(DWORD*)(patchSite + 1) = caveBase - (patchSite + 5);
+    if (patchLen == 6) *(BYTE*)(patchSite + 5) = 0x90;
+    VirtualProtect((void*)patchSite, patchLen, oldProtect, &oldProtect);
+    FlushInstructionCache(GetCurrentProcess(), (void*)patchSite, patchLen);
+}
 
 class BallTintMod : public HamsterballAPI {
 private:
     IModAPI* api = nullptr;
     HANDLE m_thread = NULL;
     volatile bool m_running = true;
+    bool m_cavesInstalled = false;
 
     void createColorSlider(const char* id, const char* label, float defaultVal) {
         CustomSlider s(id, label, defaultVal);
@@ -71,10 +143,23 @@ private:
         api->PatchMemory(addr, (const char*)&value, sizeof(float));
     }
 
+    void installCaves() {
+        if (m_cavesInstalled) return;
+
+        installCave(0, 0x421CBF, &g_p2_red, SAVED_CALL, 0x453150, 0, nullptr, 0x421CC5);
+        installCave(1, 0x421E43, &g_p4_blue, SAVED_PUSH_GLOBAL, 0, 0, &g_p4_green, 0x421E49);
+        installCave(2, 0x433029, &g_p2_red, SAVED_LEA, 0, 0x28, nullptr, 0x43302E);
+        installCave(3, 0x433095, &g_p4_blue, SAVED_PUSH_GLOBAL, 0, 0, &g_p4_green, 0x43309B);
+        installCave(4, 0x431B72, &g_p2_red, SAVED_CALL, 0x453150, 0, nullptr, 0x431B78);
+
+        m_cavesInstalled = true;
+    }
+
     void patchScoreballColors() {
         float p1r = api->GetSliderState("TINT_P1_R");
         float p1g = api->GetSliderState("TINT_P1_G");
         float p1b = api->GetSliderState("TINT_P1_B");
+        float p2r = api->GetSliderState("TINT_P2_R");
         float p2g = api->GetSliderState("TINT_P2_G");
         float p2b = api->GetSliderState("TINT_P2_B");
         float p3r = api->GetSliderState("TINT_P3_R");
@@ -82,17 +167,21 @@ private:
         float p3b = api->GetSliderState("TINT_P3_B");
         float p4r = api->GetSliderState("TINT_P4_R");
         float p4g = api->GetSliderState("TINT_P4_G");
+        float p4b = api->GetSliderState("TINT_P4_B");
+
+        g_p2_red = p2r;
+        g_p4_blue = p4b;
+        g_p4_green = p4g;
 
         patchFloat(AB_P1_R, p1r); patchFloat(AB_P1_G, p1g); patchFloat(AB_P1_B, p1b); patchFloat(AB_P1_A, 1.0f);
         patchFloat(AB_P2_G, p2g); patchFloat(AB_P2_B, p2b); patchFloat(AB_P2_A, 1.0f);
         patchFloat(AB_P3_R, p3r); patchFloat(AB_P3_G, p3g); patchFloat(AB_P3_B, p3b); patchFloat(AB_P3_A, 1.0f);
-        patchFloat(AB_P4_R, p4r); patchFloat(AB_P4_G, p4g); patchFloat(AB_P4_A, 1.0f);
+        patchFloat(AB_P4_R, p4r); patchFloat(AB_P4_A, 1.0f);
 
         patchFloat(ALS_P1_R_2P, p1r); patchFloat(ALS_P1_G_2P, p1g); patchFloat(ALS_P1_B_2P, p1b); patchFloat(ALS_P1_A_2P, 1.0f);
-        patchFloat(ALS_P1_R_4P, p1r); patchFloat(ALS_P1_G_4P, p1g); patchFloat(ALS_P1_B_4P, p1b); patchFloat(ALS_P1_A_4P, 1.0f);
         patchFloat(ALS_P2_G, p2g); patchFloat(ALS_P2_B, p2b);
         patchFloat(ALS_P3_R, p3r); patchFloat(ALS_P3_G, p3g); patchFloat(ALS_P3_B, p3b);
-        patchFloat(ALS_P4_R, p4r); patchFloat(ALS_P4_G, p4g);
+        patchFloat(ALS_P4_R, p4r);
 
         patchFloat(DM_P1_R, p1r); patchFloat(DM_P1_G, p1g); patchFloat(DM_P1_B, p1b); patchFloat(DM_P1_A, 1.0f);
         patchFloat(DM_P2_G, p2g); patchFloat(DM_P2_B, p2b); patchFloat(DM_P2_A, 1.0f);
@@ -103,10 +192,10 @@ private:
         IModAPI* api = self->api;
 
         Sleep(3000);
+        self->installCaves();
 
         while (self->m_running) {
             Sleep(16);
-
             self->patchScoreballColors();
 
             DWORD board = findBoard();
@@ -135,7 +224,7 @@ private:
 public:
     const char* GetModName() override { return "Ball Tint"; }
     const char* GetAuthorName() override { return "Hamsterbot"; }
-    const char* GetContributors() override { return "v7: arena HUD + arena menu + party menu + 3D balls"; }
+    const char* GetContributors() override { return "v10: dynamic P4 green via push [global]"; }
     int GetApiVersion() override { return HAMSTERBALL_API_VERSION; }
 
     void Initialize(IModAPI* modApi) override {
