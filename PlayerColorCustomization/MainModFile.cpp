@@ -22,13 +22,18 @@ static constexpr DWORD ALS_P4_R = 0x43309C;
 static constexpr DWORD DM_P1_R = 0x431B3C, DM_P1_G = 0x431B37, DM_P1_B = 0x431B32, DM_P1_A = 0x431B2D;
 static constexpr DWORD DM_P2_G = 0x431B6E, DM_P2_B = 0x431B69, DM_P2_A = 0x431B64;
 
+static constexpr DWORD RRM_P1_R = 0x44F0F3, RRM_P1_G = 0x44F0EE, RRM_P1_B = 0x44F0E9, RRM_P1_A = 0x44F0E4;
+static constexpr DWORD RRM_P2_G = 0x44F11C, RRM_P2_B = 0x44F117, RRM_P2_A = 0x44F112;
+static constexpr DWORD RRM_P3_R = 0x44F169, RRM_P3_G = 0x44F164, RRM_P3_B = 0x44F15F, RRM_P3_A = 0x44F15A;
+static constexpr DWORD RRM_P4_R = 0x44F1B1, RRM_P4_G = 0x44F1AC, RRM_P4_A = 0x44F1A5;
+
 static float g_p2_red = 0.0f;
 static float g_p4_blue = 0.0f;
 static float g_p4_green = 1.0f;
 
 enum SavedType { SAVED_CALL, SAVED_LEA, SAVED_PUSH_GLOBAL };
 struct CodeCave { void* caveAddr; };
-static CodeCave g_caves[5];
+static CodeCave g_caves[7];
 
 static void installCave(int idx, DWORD patchSite, float* globalFloat,
     SavedType savedType, DWORD callTarget, BYTE leaOffset,
@@ -151,6 +156,8 @@ private:
         installCave(2, 0x433029, &g_p2_red, SAVED_LEA, 0, 0x28, nullptr, 0x43302E);
         installCave(3, 0x433095, &g_p4_blue, SAVED_PUSH_GLOBAL, 0, 0, &g_p4_green, 0x43309B);
         installCave(4, 0x431B72, &g_p2_red, SAVED_CALL, 0x453150, 0, nullptr, 0x431B78);
+        installCave(5, 0x44F120, &g_p2_red, SAVED_LEA, 0, 0x30, nullptr, 0x44F126);
+        installCave(6, 0x44F1A9, &g_p4_blue, SAVED_PUSH_GLOBAL, 0, 0, &g_p4_green, 0x44F1B0);
 
         m_cavesInstalled = true;
     }
@@ -185,6 +192,11 @@ private:
 
         patchFloat(DM_P1_R, p1r); patchFloat(DM_P1_G, p1g); patchFloat(DM_P1_B, p1b); patchFloat(DM_P1_A, 1.0f);
         patchFloat(DM_P2_G, p2g); patchFloat(DM_P2_B, p2b); patchFloat(DM_P2_A, 1.0f);
+
+        patchFloat(RRM_P1_R, p1r); patchFloat(RRM_P1_G, p1g); patchFloat(RRM_P1_B, p1b); patchFloat(RRM_P1_A, 1.0f);
+        patchFloat(RRM_P2_G, p2g); patchFloat(RRM_P2_B, p2b); patchFloat(RRM_P2_A, 1.0f);
+        patchFloat(RRM_P3_R, p3r); patchFloat(RRM_P3_G, p3g); patchFloat(RRM_P3_B, p3b); patchFloat(RRM_P3_A, 1.0f);
+        patchFloat(RRM_P4_R, p4r); patchFloat(RRM_P4_A, 1.0f);
     }
 
     static DWORD WINAPI tintThread(LPVOID param) {
@@ -224,7 +236,7 @@ private:
 public:
     const char* GetModName() override { return "Ball Tint"; }
     const char* GetAuthorName() override { return "Hamsterbot"; }
-    const char* GetContributors() override { return "v10: dynamic P4 green via push [global]"; }
+    const char* GetContributors() override { return "v11: arena round-end winner display"; }
     int GetApiVersion() override { return HAMSTERBALL_API_VERSION; }
 
     void Initialize(IModAPI* modApi) override {
