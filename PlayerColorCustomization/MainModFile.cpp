@@ -51,7 +51,7 @@ private:
         *(float*)(addr + 0x0C) = 1.0f;
     }
 
-    // Find board via App->+0x220→+0x0C (proven bass.dll path)
+    // Find board via App→+0x220→+0x0C (proven bass.dll path)
     static DWORD findBoard() {
         DWORD appPtr = *(DWORD*)GLOBAL_APP_PTR;
         if (!appPtr || appPtr < 0x10000) return 0;
@@ -71,11 +71,9 @@ private:
         IModAPI* api = self->api;
 
         Sleep(3000); // Wait for game to initialize
-        printf("[BallTint] Background thread started\n");
 
-        int counter = 0;
         while (self->m_running) {
-            Sleep(16); // ~60Hz, same as bass.dll's 30ms
+            Sleep(16); // ~60Hz, same concept as bass.dll's 30ms
 
             DWORD board = findBoard();
             if (!board) continue;
@@ -97,16 +95,6 @@ private:
                 api->GetSliderState("TINT_P4_R"),
                 api->GetSliderState("TINT_P4_G"),
                 api->GetSliderState("TINT_P4_B"));
-
-            // Debug print every ~5 seconds (300 iterations * 16ms ≈ 5s)
-            counter++;
-            if (counter % 300 == 0) {
-                float p1r = api->GetSliderState("TINT_P1_R");
-                float p1g = api->GetSliderState("TINT_P1_G");
-                float p1b = api->GetSliderState("TINT_P1_B");
-                printf("[BallTint] thread: board=%08lX P1(%.2f,%.2f,%.2f)\n",
-                    (unsigned long)board, p1r, p1g, p1b);
-            }
         }
         return 0;
     }
@@ -119,7 +107,6 @@ public:
 
     void Initialize(IModAPI* modApi) override {
         api = modApi;
-        printf("[BallTint] Initialize() api=%p\n", (void*)api);
 
         createColorSlider("TINT_P1_R", "P1 Red", 1.0f);
         createColorSlider("TINT_P1_G", "P1 Green", 1.0f);
@@ -136,7 +123,6 @@ public:
 
         // Spawn background thread (same approach as working bass.dll version)
         m_thread = CreateThread(NULL, 0, tintThread, this, 0, NULL);
-        printf("[BallTint] Background thread spawned: handle=%p\n", (void*)m_thread);
     }
 
     ~BallTintMod() {
