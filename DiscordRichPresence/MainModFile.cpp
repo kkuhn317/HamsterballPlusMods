@@ -65,6 +65,7 @@ struct GameState {
     bool inLevel;
     bool isArena;
     bool isPartyRace;
+    bool isTournament;
     const char* displayName;
     const char* imageKey;
     time_t levelStartTime;
@@ -256,6 +257,14 @@ static void ReadGameState(IModAPI* api) {
         if (api->GetPlayer3()) pc++;
         if (api->GetPlayer4()) pc++;
         g_currentState.isPartyRace = (pc > 1);
+
+        char* appBase = (char*)api->GetApp();
+        if (appBase && !IsBadReadPtr(appBase + 0x220, 4)) {
+            DWORD profile = *(DWORD*)(appBase + 0x220);
+            if (profile && profile > 0x10000 && !IsBadReadPtr((char*)profile + 0x11, 1)) {
+                g_currentState.isTournament = (*(BYTE*)((char*)profile + 0x11) == 0);
+            }
+        }
     }
     else if (arena) {
         g_currentState.inLevel = true;
@@ -275,6 +284,7 @@ static bool StateChanged() {
     if (g_currentState.inLevel != g_lastSentState.inLevel) return true;
     if (g_currentState.isArena != g_lastSentState.isArena) return true;
     if (g_currentState.isPartyRace != g_lastSentState.isPartyRace) return true;
+    if (g_currentState.isTournament != g_lastSentState.isTournament) return true;
     if (g_currentState.displayName != g_lastSentState.displayName) return true;
     return false;
 }
@@ -299,8 +309,11 @@ static void BuildPresence(char* outState, int stateLen, char* outDetails, int de
     else if (g_currentState.isPartyRace) {
         strncpy_s(outState, stateLen, "Party Race", _TRUNCATE);
     }
+    else if (g_currentState.isTournament) {
+        strncpy_s(outState, stateLen, "Tournament", _TRUNCATE);
+    }
     else {
-        strncpy_s(outState, stateLen, "Single Race", _TRUNCATE);
+        strncpy_s(outState, stateLen, "Time Trials", _TRUNCATE);
     }
 
     strncpy_s(outDetails, detailsLen, g_currentState.displayName ? g_currentState.displayName : "Unknown", _TRUNCATE);
