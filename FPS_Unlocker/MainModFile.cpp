@@ -80,6 +80,7 @@ private:
 public:
     const char* GetModName() override { return "FPS Unlocker"; }
     const char* GetAuthorName() override { return "BookwormKevin"; }
+    const char* GetContributors() override { return "Hamsterbot"; }
 
     int GetApiVersion() override { return HAMSTERBALL_API_VERSION; }
 

@@ -410,7 +410,8 @@ private:
     HANDLE thread = NULL;
 public:
     const char* GetModName() override { return "Discord Rich Presence"; }
-    const char* GetAuthorName() override { return "Hamsterbot"; }
+    const char* GetAuthorName() override { return "BookwormKevin"; }
+    const char* GetContributors() override { return "Hamsterbot"; }
     int GetApiVersion() override { return HAMSTERBALL_API_VERSION; }
 
     void Initialize(IModAPI* modApi) override {

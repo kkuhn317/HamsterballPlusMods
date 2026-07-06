@@ -5,19 +5,15 @@
 static bool g_hideUI = false;
 static bool g_hideBall = false;
 static bool g_disableFog = false;
+static bool g_fogSaved = false;
+static float g_origFogStart = 0.0f;
+static float g_origFogEnd = 0.0f;
+static float g_origFarPlane = 0.0f;
 
 // Font_DrawGlyph: RET 0x20 = 8 stack params → 10 total (ecx + edx + 8)
 typedef void(__fastcall* FontDrawGlyph_t)(void*, void*, const char*, int, int,
     void*, void*, void*, void*, void*);
 static FontDrawGlyph_t orig_FontDrawGlyph = nullptr;
-
-// Sprite_DrawRect: RET 0x1c = 7 stack params → 9 total
-typedef void(__fastcall* SpriteDrawRect_t)(void*, void*, void*, void*, void*, void*, void*, void*, void*);
-static SpriteDrawRect_t orig_SpriteDrawRect = nullptr;
-
-// Sprite_RenderQuad: RET 0x14 = 5 stack params → 7 total
-typedef void(__fastcall* SpriteRenderQuad_t)(void*, void*, void*, void*, void*, void*, void*);
-static SpriteRenderQuad_t orig_SpriteRenderQuad = nullptr;
 
 // Sprite_DrawRotatedQuad: RET 0x24 = 9 stack params → 11 total
 typedef void(__fastcall* SpriteDrawRotatedQuad_t)(void*, void*, void*, void*, void*, void*, void*, void*, void*, void*, void*);
@@ -37,18 +33,6 @@ static void __fastcall hook_FontDrawGlyph(void* thisPtr, void* edx, const char* 
     void* p4, void* p5, void* p6, void* p7, void* p8) {
     if (g_hideUI) return;
     orig_FontDrawGlyph(thisPtr, edx, text, x, y, p4, p5, p6, p7, p8);
-}
-
-static void __fastcall hook_SpriteDrawRect(void* thisPtr, void* edx,
-    void* p1, void* p2, void* p3, void* p4, void* p5, void* p6, void* p7) {
-    if (g_hideUI) return;
-    orig_SpriteDrawRect(thisPtr, edx, p1, p2, p3, p4, p5, p6, p7);
-}
-
-static void __fastcall hook_SpriteRenderQuad(void* thisPtr, void* edx,
-    void* p1, void* p2, void* p3, void* p4, void* p5) {
-    if (g_hideUI) return;
-    orig_SpriteRenderQuad(thisPtr, edx, p1, p2, p3, p4, p5);
 }
 
 static void __fastcall hook_SpriteDrawRotatedQuad(void* thisPtr, void* edx,
@@ -122,7 +106,8 @@ private:
 
 public:
     const char* GetModName() override { return "FreeCam"; }
-    const char* GetAuthorName() override { return "umans"; }
+    const char* GetAuthorName() override { return "BookwormKevin"; }
+    const char* GetContributors() override { return "Hamsterbot"; }
     int GetApiVersion() override { return HAMSTERBALL_API_VERSION; }
 
     void Initialize(IModAPI* modApi) override {
@@ -132,8 +117,6 @@ public:
         api->RegisterCustomControl("FREECAM_HIDEBALL", CustomControl(DIK_F9));
         api->RegisterCustomControl("FREECAM_FOG", CustomControl(DIK_F10));
         api->RegisterCustomHook(0x457440, (void*)hook_FontDrawGlyph, (void**)&orig_FontDrawGlyph);
-        api->RegisterCustomHook(0x45D300, (void*)hook_SpriteDrawRect, (void**)&orig_SpriteDrawRect);
-        api->RegisterCustomHook(0x45D660, (void*)hook_SpriteRenderQuad, (void**)&orig_SpriteRenderQuad);
         api->RegisterCustomHook(0x45DAB0, (void*)hook_SpriteDrawRotatedQuad, (void**)&orig_SpriteDrawRotatedQuad);
         api->RegisterCustomHook(0x455D60, (void*)hook_GraphicsDrawScreenRect, (void**)&orig_GraphicsDrawScreenRect);
         api->RegisterCustomHook(0x45D450, (void*)hook_SpriteDrawExtended, (void**)&orig_SpriteDrawExtended);
@@ -203,12 +186,23 @@ public:
         // gfx = App+0x174, D3D device = gfx+0x154, SetRenderState = vtable[50].
         // FOGSTART = 36, FOGEND = 37 (values are float bits).
         // Graphics_SetProjection at RVA 0x54AB0 = __thiscall(gfx, near, far).
-        // Original near=20.0, far=calculated. We push far to 100000.
+        // Original near=20.0, far=stored at gfx+0x794. We push far to 100000.
+        // On re-enable: restore original FOGSTART/FOGEND from gfx struct and
+        // rebuild projection with original far plane (gfx+0x794 was overwritten
+        // by our call, but gfx+0x790=near and gfx+0x184=screen dist still exist).
+        // Simplest: read original far from gfx+0x794 BEFORE first override.
         if (g_disableFog) {
             App* app = api->GetApp();
             if (app && !IsBadReadPtr(app, sizeof(App))) {
                 void* gfx = app->graphics;
                 if (gfx && !IsBadReadPtr(gfx, 0x800)) {
+                    // Save original fog/projection values on first use
+                    if (!g_fogSaved) {
+                        g_origFogStart = *(float*)((uint8_t*)gfx + 0x73C);
+                        g_origFogEnd = *(float*)((uint8_t*)gfx + 0x740);
+                        g_origFarPlane = *(float*)((uint8_t*)gfx + 0x794);
+                        g_fogSaved = true;
+                    }
                     // Push fog start/end to extreme distances via D3D SetRenderState
                     void* device = *(void**)((uint8_t*)gfx + 0x154);
                     if (device && !IsBadReadPtr(device, 4)) {
@@ -223,14 +217,36 @@ public:
                         }
                     }
                     // Rebuild projection matrix with large far clip plane
-                    // Graphics_SetProjection at RVA 0x54AB0, __thiscall(gfx, near, far)
-                    // CallMethod is a free template function, not a class member
                     DWORD projAddr = (DWORD)GetModuleHandle(NULL) + 0x54AB0;
                     typedef void(__thiscall* SetProj_t)(void*, float, float);
                     SetProj_t setProj = (SetProj_t)projAddr;
                     setProj((void*)gfx, 20.0f, 100000.0f);
                 }
             }
+        }
+        else if (g_fogSaved) {
+            // Restore original fog and projection
+            App* app = api->GetApp();
+            if (app && !IsBadReadPtr(app, sizeof(App))) {
+                void* gfx = app->graphics;
+                if (gfx && !IsBadReadPtr(gfx, 0x800)) {
+                    void* device = *(void**)((uint8_t*)gfx + 0x154);
+                    if (device && !IsBadReadPtr(device, 4)) {
+                        void** vtable = *(void***)device;
+                        if (vtable && !IsBadReadPtr(vtable, 0xCC)) {
+                            typedef long(__stdcall* D3DSetRenderState_t)(void*, DWORD, DWORD);
+                            D3DSetRenderState_t srs = (D3DSetRenderState_t)vtable[50];
+                            srs(device, 36, *(DWORD*)&g_origFogStart);
+                            srs(device, 37, *(DWORD*)&g_origFogEnd);
+                        }
+                    }
+                    DWORD projAddr = (DWORD)GetModuleHandle(NULL) + 0x54AB0;
+                    typedef void(__thiscall* SetProj_t)(void*, float, float);
+                    SetProj_t setProj = (SetProj_t)projAddr;
+                    setProj((void*)gfx, 20.0f, g_origFarPlane);
+                }
+            }
+            g_fogSaved = false;
         }
 
         if (!active || !initialized) return;
