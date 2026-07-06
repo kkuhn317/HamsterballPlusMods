@@ -4,6 +4,7 @@
 
 static bool g_hideUI = false;
 static bool g_hideBall = false;
+static bool g_disableFog = false;
 
 // Font_DrawGlyph: RET 0x20 = 8 stack params → 10 total (ecx + edx + 8)
 typedef void(__fastcall* FontDrawGlyph_t)(void*, void*, const char*, int, int,
@@ -129,6 +130,7 @@ public:
         api->RegisterCustomControl("FREECAM_TOGGLE", CustomControl(DIK_F7));
         api->RegisterCustomControl("FREECAM_HIDEUI", CustomControl(DIK_F8));
         api->RegisterCustomControl("FREECAM_HIDEBALL", CustomControl(DIK_F9));
+        api->RegisterCustomControl("FREECAM_FOG", CustomControl(DIK_F10));
         api->RegisterCustomHook(0x457440, (void*)hook_FontDrawGlyph, (void**)&orig_FontDrawGlyph);
         api->RegisterCustomHook(0x45D300, (void*)hook_SpriteDrawRect, (void**)&orig_SpriteDrawRect);
         api->RegisterCustomHook(0x45D660, (void*)hook_SpriteRenderQuad, (void**)&orig_SpriteRenderQuad);
@@ -187,6 +189,46 @@ public:
                 bool respawning = *((uint8_t*)ball + 0x2F9) != 0;
                 if (!respawning) {
                     *(float*)((uint8_t*)ball + 0x2FC) = 0.0f;
+                }
+            }
+        }
+
+        if (api->WasControlPressed("FREECAM_FOG")) {
+            g_disableFog = !g_disableFog;
+            printf("[FreeCam] Fog: %s\n", g_disableFog ? "DISABLED" : "ENABLED");
+        }
+
+        // Fog + draw distance: push FOGSTART/FOGEND to extreme distances,
+        // and rebuild projection matrix with large far clip plane.
+        // gfx = App+0x174, D3D device = gfx+0x154, SetRenderState = vtable[50].
+        // FOGSTART = 36, FOGEND = 37 (values are float bits).
+        // Graphics_SetProjection at RVA 0x54AB0 = __thiscall(gfx, near, far).
+        // Original near=20.0, far=calculated. We push far to 100000.
+        if (g_disableFog) {
+            App* app = api->GetApp();
+            if (app && !IsBadReadPtr(app, sizeof(App))) {
+                void* gfx = app->graphics;
+                if (gfx && !IsBadReadPtr(gfx, 0x800)) {
+                    // Push fog start/end to extreme distances via D3D SetRenderState
+                    void* device = *(void**)((uint8_t*)gfx + 0x154);
+                    if (device && !IsBadReadPtr(device, 4)) {
+                        void** vtable = *(void***)device;
+                        if (vtable && !IsBadReadPtr(vtable, 0xCC)) {
+                            typedef long(__stdcall* D3DSetRenderState_t)(void*, DWORD, DWORD);
+                            D3DSetRenderState_t srs = (D3DSetRenderState_t)vtable[50];
+                            float fogStart = 99999.0f;
+                            float fogEnd = 100000.0f;
+                            srs(device, 36, *(DWORD*)&fogStart);
+                            srs(device, 37, *(DWORD*)&fogEnd);
+                        }
+                    }
+                    // Rebuild projection matrix with large far clip plane
+                    // Graphics_SetProjection at RVA 0x54AB0, __thiscall(gfx, near, far)
+                    // CallMethod is a free template function, not a class member
+                    DWORD projAddr = (DWORD)GetModuleHandle(NULL) + 0x54AB0;
+                    typedef void(__thiscall* SetProj_t)(void*, float, float);
+                    SetProj_t setProj = (SetProj_t)projAddr;
+                    setProj((void*)gfx, 20.0f, 100000.0f);
                 }
             }
         }
