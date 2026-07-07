@@ -30,6 +30,10 @@ This mod mainly lets you move the camera wherever you want, but also a few other
 - F9 - Hide/Show the player
 - F10 - Remove/Restore fog
 
+## Ghost Saver
+
+With this mod installed, there will be a Ghosts folder created in your Hamsterball installation folder. You can load other people's ghosts by putting their ghost files in the folder. When you beat their ghost, your ghost data will be saved in the folder, replacing the old one.
+
 ## Gravity Mod
 
 This lets you change the gravity of the game to whatever you want. It defaults to 5.
