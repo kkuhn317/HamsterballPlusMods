@@ -1,5 +1,7 @@
 # Hamsterball Plus Mods
 
+[DOWNLOAD HERE](https://github.com/kkuhn317/HamsterballPlusMods/releases)
+
 This has a few Hamsterball mods for use with Hamsterball Plus! Most of the code for these was written by Hamsterbot, an AI that specializes in Hamsterball modding, but I have tried to make all the mods in this repo work well and don't have any weird behavior.
 
 Find Hamsterball Plus here: https://github.com/artizard/Hamsterball-Plus
