@@ -22,6 +22,14 @@ However, there are currently a couple issues with this mod that I haven't fixed 
 - The player ball and 8 balls rotate faster if the framerate is higher
 - The camera becomes less smooth at high framerates.
 
+## Freecam
+
+This mod mainly lets you move the camera wherever you want, but also a few other things. Here's the controls:
+- F7 - Start Freecam. Use WASDEQ to move, arrow keys to rotate.
+- F8 - Hide/Show the UI
+- F9 - Hide/Show the player
+- F10 - Remove/Restore fog
+
 ## Gravity Mod
 
 This lets you change the gravity of the game to whatever you want. It defaults to 5.
