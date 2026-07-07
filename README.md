@@ -41,3 +41,5 @@ This lets you change the gravity of the game to whatever you want. It defaults t
 ## Player Color Customization
 
 This mod lets you customize the color of all 4 players. It also applies the custom colors to the UI elements showing the player's scores and who won the arena match.
+
+- WARNING: This mod's settings fill up the options screen, which is not ideal. As soon as Hamsterball Plus is updated so the color options don't need to be there, I'll fix it.
