@@ -10,13 +10,11 @@ private:
 
 	static inline bool g_inSceneRender = false;
 	static inline int g_viewportCallCount = 0;
+	static inline bool g_inUIPass = false;
 
-	// Scale factor (presentParams+0x1f8) and X offset (gfx+0x798)
-	static inline bool g_uiModified = false;
-	static inline float g_origScaleX = 0.0f;
-	static inline int g_origOffsetX = 0;
-	static inline DWORD g_scaleXAddr = 0;
-	static inline DWORD g_offsetXAddr = 0;
+	// Precomputed per-frame values for the transform
+	static inline float g_scaleFactor = 1.0f;
+	static inline float g_margin = 0.0f;
 
 	typedef void(__fastcall* SetViewport_t)(void*, void*, int, int);
 	static inline SetViewport_t orig_SetViewport = nullptr;
@@ -24,84 +22,41 @@ private:
 	typedef void(__fastcall* SceneRender_t)(void*, void*, void*);
 	static inline SceneRender_t orig_SceneRender = nullptr;
 
+	typedef float(__fastcall* TransformY_t)(void*, void*, float);
+	static inline TransformY_t orig_TransformY = nullptr;
+
 	// UI coordinate system (from Ghidra decompilation):
-	//   Gfx_TransformY(pixel_x) = pixel_x * scaleX + offsetX
-	//   Gfx_TransformZ(pixel_y) = pixel_y * scaleY + offsetY
+	//   Gfx_TransformY(gfx, pixel_x) = pixel_x * scaleX + offsetX
+	//   Gfx_TransformZ(gfx, pixel_y) = pixel_y * scaleY + offsetY
+	//
+	// Returns screen-space pixel coordinates (used with D3DFVF_XYZRHW).
+	// On 16:9, scaleX stretches X coordinates → UI stretches.
+	//
+	// Fix: hook Gfx_TransformY and apply a linear transform to its output:
+	//   corrected = result * scaleFactor + margin
 	//
 	// Where:
-	//   scaleX = *(float*)(config + 0x1f8)   (config = *(gfx+0x5c))
-	//   scaleY = *(float*)(config + 0x1fc)
-	//   offsetX = *(int*)(gfx + 0x798)
-	//   offsetY = *(int*)(gfx + 0x79c)
-	//   bbWidth = *(int*)(config + 0x15c)
-	//   bbHeight = *(int*)(config + 0x160)
+	//   scaleFactor = (4/3) / screenAspect = (4*bbHeight) / (3*bbWidth)
+	//   margin = (bbWidth - bbHeight * 4/3) / 2
 	//
-	// Graphics_SetViewport sets:
-	//   gfx+0x798 = 0  (offsetX, reset to 0 for full-screen)
-	//   gfx+0x79c = 0  (offsetY)
-	//   gfx+0x7a0 = (float)bbWidth  (render width)
-	//   gfx+0x7a4 = (float)bbHeight (render height)
-	//   Then builds the projection with aspect = renderW / renderH
+	// This maps:
+	//   result=0          → margin (left pillarbox edge)
+	//   result=bbWidth/2  → bbWidth/2 (screen center — UNCHANGED!)
+	//   result=bbWidth    → bbWidth - margin (right pillarbox edge)
 	//
-	// On 16:9, scaleX is calibrated for the full width, so UI stretches.
-	// Fix: shrink scaleX proportionally and add X offset to center (pillarbox).
-	static void fixUIScale(void* gfx) {
-		DWORD gfxAddr = (DWORD)gfx;
-		if (IsBadReadPtr(gfx, 0x800)) return;
+	// Screen center stays at screen center because:
+	//   (bbWidth/2) * scaleFactor + margin
+	//   = (bbWidth/2) * (bbH*4/3/bbW) + (bbW - bbH*4/3)/2
+	//   = (bbH*4/3)/2 + (bbW - bbH*4/3)/2
+	//   = (bbH*4/3 + bbW - bbH*4/3) / 2 = bbW/2  ✓
+	//
+	// This keeps centered elements (timer blot) centered while
+	// properly pillarboxing left/right-aligned elements.
 
-		DWORD config = *(DWORD*)(gfxAddr + 0x5c);
-		if (!config || IsBadReadPtr((void*)config, 0x200)) return;
-
-		DWORD bbWidth = *(DWORD*)(config + 0x15c);
-		DWORD bbHeight = *(DWORD*)(config + 0x160);
-		if (bbWidth <= 0 || bbHeight <= 0) return;
-
-		// Already 4:3 or taller — no fix needed
-		float currentAspect = (float)bbWidth / (float)bbHeight;
-		if (currentAspect <= 1.34f) return;
-
-		float scaleX = *(float*)(config + 0x1f8);
-		float scaleY = *(float*)(config + 0x1fc);
-
-		// The correct scaleX for 4:3 UI proportions:
-		//   On 4:3: scaleX/scaleY = 1.0 (already correct)
-		//   On 16:9: scaleX/scaleY = 16:9 / 4:3 = 4/3, so scaleX is 4/3 too large
-		//   Fix: newScaleX = scaleX * (4/3) / (screenAspect)
-		//   = scaleX * (4.0 * bbHeight) / (3.0 * bbWidth)
-		float aspectRatio = (float)bbWidth / (float)bbHeight;
-		float ratio43 = 4.0f / 3.0f;
-		float newScaleX = scaleX * ratio43 / aspectRatio;
-
-		// Center the UI: shift X offset so the compressed UI is centered.
-		// The UI's effective pixel width after compression = bbWidth * (newScaleX / scaleX)
-		// = bbWidth * (ratio43 / aspectRatio) = bbWidth * (4/3) / (bbWidth/bbHeight)
-		// = bbHeight * 4/3
-		// Pillarbox margin = (bbWidth - bbHeight*4/3) / 2
-		// Offset in NDC = margin * newScaleX
-		float uiWidth = (float)bbHeight * ratio43;
-		float marginPixels = ((float)bbWidth - uiWidth) / 2.0f;
-		int newOffsetX = (int)(marginPixels * newScaleX);
-
-		// Save originals
-		g_origScaleX = scaleX;
-		g_origOffsetX = *(int*)(gfxAddr + 0x798);
-		g_scaleXAddr = config + 0x1f8;
-		g_offsetXAddr = gfxAddr + 0x798;
-		g_uiModified = true;
-
-		// Apply
-		*(float*)(config + 0x1f8) = newScaleX;
-		*(int*)(gfxAddr + 0x798) = newOffsetX;
-	}
-
-	static void restoreUIScale() {
-		if (g_uiModified) {
-			if (g_scaleXAddr) *(float*)g_scaleXAddr = g_origScaleX;
-			if (g_offsetXAddr) *(int*)g_offsetXAddr = g_origOffsetX;
-			g_uiModified = false;
-			g_scaleXAddr = 0;
-			g_offsetXAddr = 0;
-		}
+	static float __fastcall hook_TransformY(void* gfx, void* edx, float pixel_x) {
+		float result = orig_TransformY(gfx, edx, pixel_x);
+		if (!g_enabled || !g_inUIPass) return result;
+		return result * g_scaleFactor + g_margin;
 	}
 
 	static void __fastcall hook_SetViewport(void* gfx, void* edx, int param1, int param2) {
@@ -113,19 +68,36 @@ private:
 		g_viewportCallCount++;
 
 		// 1st (0,0) = 3D pass → leave alone
-		// 2nd (0,0) = UI pass → fix scale + center
+		// 2nd (0,0) = UI pass → precompute transform values
 		if (g_viewportCallCount == 2) {
-			fixUIScale(gfx);
+			g_inUIPass = true;
+
+			DWORD gfxAddr = (DWORD)gfx;
+			if (IsBadReadPtr(gfx, 0x800)) return;
+
+			DWORD config = *(DWORD*)(gfxAddr + 0x5c);
+			if (!config || IsBadReadPtr((void*)config, 0x200)) return;
+
+			DWORD bbWidth = *(DWORD*)(config + 0x15c);
+			DWORD bbHeight = *(DWORD*)(config + 0x160);
+			if (bbWidth <= 0 || bbHeight <= 0) return;
+
+			float aspect = (float)bbWidth / (float)bbHeight;
+			if (aspect <= 1.34f) return; // already 4:3
+
+			float ratio43 = 4.0f / 3.0f;
+			g_scaleFactor = ratio43 / aspect;
+			g_margin = ((float)bbWidth - (float)bbHeight * ratio43) / 2.0f;
 		}
 	}
 
 	static void __fastcall hook_SceneRender(void* this_ptr, void* edx, void* param1) {
-		restoreUIScale();
-		g_inSceneRender = true;
+		g_inUIPass = false;
 		g_viewportCallCount = 0;
+		g_inSceneRender = true;
 		orig_SceneRender(this_ptr, edx, param1);
 		g_inSceneRender = false;
-		restoreUIScale();
+		g_inUIPass = false;
 	}
 
 public:
@@ -140,6 +112,7 @@ public:
 		btn.displayText = "Widescreen UI Fix";
 		btn.defaultState = true;
 		api->CreateToggleButton(btn, this);
+		api->RegisterCustomHook(0x453e90, (void*)hook_TransformY, (void**)&orig_TransformY);
 		api->RegisterCustomHook(0x454f10, (void*)hook_SetViewport, (void**)&orig_SetViewport);
 		api->RegisterCustomHook(0x41a2e0, (void*)hook_SceneRender, (void**)&orig_SceneRender);
 	}
