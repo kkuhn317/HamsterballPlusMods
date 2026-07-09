@@ -8,7 +8,6 @@ private:
 	IModAPI* api = nullptr;
 	static inline bool g_enabled = true;
 
-	static inline bool g_inSceneRender = false;
 	static inline bool g_inUIPass = false;
 
 	// Precomputed per-frame values for the transform
@@ -69,7 +68,7 @@ private:
 	static void __fastcall hook_SetViewport(void* gfx, void* edx, int param1, int param2) {
 		orig_SetViewport(gfx, edx, param1, param2);
 
-		if (!g_enabled || !g_inSceneRender) return;
+		if (!g_enabled) return;
 		if (param1 != 0 || param2 != 0) return;
 
 		// Any (0,0) call inside Scene_Render = full-screen pass.
@@ -97,9 +96,7 @@ private:
 
 	static void __fastcall hook_SceneRender(void* this_ptr, void* edx, void* param1) {
 		g_inUIPass = false;
-		g_inSceneRender = true;
 		orig_SceneRender(this_ptr, edx, param1);
-		g_inSceneRender = false;
 		g_inUIPass = false;
 	}
 
