@@ -9,7 +9,6 @@ private:
 	static inline bool g_enabled = true;
 
 	static inline bool g_inSceneRender = false;
-	static inline int g_viewportCallCount = 0;
 	static inline bool g_inUIPass = false;
 
 	// Precomputed per-frame values for the transform
@@ -59,41 +58,45 @@ private:
 		return result * g_scaleFactor + g_margin;
 	}
 
+	// Gfx_TransformY is only called by Sprite_DrawRect and similar
+	// sprite functions — these are UI-only. The 3D pass uses the
+	// projection matrix and vertex shaders, NOT Gfx_TransformY.
+	// So we can safely apply the transform on ANY (0,0) viewport
+	// call inside Scene_Render, not just the 2nd one.
+	//
+	// This fixes Party Race (split-screen, size==2) where there's
+	// only ONE (0,0) call (the UI pass), not two.
 	static void __fastcall hook_SetViewport(void* gfx, void* edx, int param1, int param2) {
 		orig_SetViewport(gfx, edx, param1, param2);
 
 		if (!g_enabled || !g_inSceneRender) return;
 		if (param1 != 0 || param2 != 0) return;
 
-		g_viewportCallCount++;
+		// Any (0,0) call inside Scene_Render = full-screen pass.
+		// Gfx_TransformY is only used by UI sprite functions, so
+		// enabling the transform here is safe for 3D too.
+		g_inUIPass = true;
 
-		// 1st (0,0) = 3D pass → leave alone
-		// 2nd (0,0) = UI pass → precompute transform values
-		if (g_viewportCallCount == 2) {
-			g_inUIPass = true;
+		DWORD gfxAddr = (DWORD)gfx;
+		if (IsBadReadPtr(gfx, 0x800)) return;
 
-			DWORD gfxAddr = (DWORD)gfx;
-			if (IsBadReadPtr(gfx, 0x800)) return;
+		DWORD config = *(DWORD*)(gfxAddr + 0x5c);
+		if (!config || IsBadReadPtr((void*)config, 0x200)) return;
 
-			DWORD config = *(DWORD*)(gfxAddr + 0x5c);
-			if (!config || IsBadReadPtr((void*)config, 0x200)) return;
+		DWORD bbWidth = *(DWORD*)(config + 0x15c);
+		DWORD bbHeight = *(DWORD*)(config + 0x160);
+		if (bbWidth <= 0 || bbHeight <= 0) return;
 
-			DWORD bbWidth = *(DWORD*)(config + 0x15c);
-			DWORD bbHeight = *(DWORD*)(config + 0x160);
-			if (bbWidth <= 0 || bbHeight <= 0) return;
+		float aspect = (float)bbWidth / (float)bbHeight;
+		if (aspect <= 1.34f) return; // already 4:3
 
-			float aspect = (float)bbWidth / (float)bbHeight;
-			if (aspect <= 1.34f) return; // already 4:3
-
-			float ratio43 = 4.0f / 3.0f;
-			g_scaleFactor = ratio43 / aspect;
-			g_margin = ((float)bbWidth - (float)bbHeight * ratio43) / 2.0f;
-		}
+		float ratio43 = 4.0f / 3.0f;
+		g_scaleFactor = ratio43 / aspect;
+		g_margin = ((float)bbWidth - (float)bbHeight * ratio43) / 2.0f;
 	}
 
 	static void __fastcall hook_SceneRender(void* this_ptr, void* edx, void* param1) {
 		g_inUIPass = false;
-		g_viewportCallCount = 0;
 		g_inSceneRender = true;
 		orig_SceneRender(this_ptr, edx, param1);
 		g_inSceneRender = false;
