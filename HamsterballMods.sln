@@ -19,6 +19,8 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "GhostSaver", "GhostSaver\Gh
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "TimerPrecision", "TimerPrecision\TimerPrecision.vcxproj", "{C93F20D0-2EBB-43CE-B0A2-46C054387E82}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "WidescreenUIFix", "WidescreenUIFix\WidescreenUIFix.vcxproj", "{FD3C8F55-AE29-40BF-8CD3-466167092E4E}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|x64 = Debug|x64
@@ -91,6 +93,14 @@ Global
 		{C93F20D0-2EBB-43CE-B0A2-46C054387E82}.Release|x64.Build.0 = Release|x64
 		{C93F20D0-2EBB-43CE-B0A2-46C054387E82}.Release|x86.ActiveCfg = Release|Win32
 		{C93F20D0-2EBB-43CE-B0A2-46C054387E82}.Release|x86.Build.0 = Release|Win32
+		{FD3C8F55-AE29-40BF-8CD3-466167092E4E}.Debug|x64.ActiveCfg = Debug|x64
+		{FD3C8F55-AE29-40BF-8CD3-466167092E4E}.Debug|x64.Build.0 = Debug|x64
+		{FD3C8F55-AE29-40BF-8CD3-466167092E4E}.Debug|x86.ActiveCfg = Debug|Win32
+		{FD3C8F55-AE29-40BF-8CD3-466167092E4E}.Debug|x86.Build.0 = Debug|Win32
+		{FD3C8F55-AE29-40BF-8CD3-466167092E4E}.Release|x64.ActiveCfg = Release|x64
+		{FD3C8F55-AE29-40BF-8CD3-466167092E4E}.Release|x64.Build.0 = Release|x64
+		{FD3C8F55-AE29-40BF-8CD3-466167092E4E}.Release|x86.ActiveCfg = Release|Win32
+		{FD3C8F55-AE29-40BF-8CD3-466167092E4E}.Release|x86.Build.0 = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
