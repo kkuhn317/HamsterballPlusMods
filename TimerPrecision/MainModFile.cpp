@@ -84,7 +84,9 @@ public:
         api = modApi;
         CustomButton btn;
         btn.id = "timer_precision";
-        btn.displayText = "Timer Precision (2 decimals)";
+        btn.displayText = "Timer Decimals";
+        btn.trueText = "2";
+        btn.falseText = "1";
         btn.defaultState = true;
         api->CreateToggleButton(btn, this);
         applyPatches(api);

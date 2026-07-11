@@ -103,7 +103,7 @@ public:
     void Initialize(IModAPI* modApi) override {
         api = modApi;
 
-        createSlider("ARENA_TIMER", "Arena Timer (seconds)", 60, 1, 600);
+        createSlider("ARENA_TIMER", "Arena Timer (secs)", 60, 1, 600);
 
         m_thread = CreateThread(NULL, 0, timerThread, this, 0, NULL);
     }
