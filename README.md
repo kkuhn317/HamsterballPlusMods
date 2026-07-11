@@ -44,4 +44,10 @@ This lets you change the gravity of the game to whatever you want. It defaults t
 
 This mod lets you customize the color of all 4 players. It also applies the custom colors to the UI elements showing the player's scores and who won the arena match.
 
-- WARNING: This mod's settings fill up the options screen, which is not ideal. As soon as Hamsterball Plus is updated so the color options don't need to be there, I'll fix it.
+## Timer Precision
+
+This mod makes all the timers in the game display 2 digits after the decimal, instead of just 1. This reflects the actual precision of the timers internally.
+
+## Widescreen UI Fix
+
+This mod stops the UI from becoming stretched using a 16:9 aspect ratio. Right now I have it not apply to the menus, just in-game, and there is an issue with displaying the square behind the rank image, which I will eventually fix.
