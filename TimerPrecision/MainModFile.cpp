@@ -3,51 +3,38 @@
 #include <string.h>
 
 // ============================================================================
-// Timer Precision Mod — increases ALL timer displays from 1 to 2 decimal places
+// Timer Precision Mod — toggles ALL timer displays between 1 and 2 decimal places
 //
 // Game timer: 100 ticks = 1 second
-// Original:  integer=timer/100, decimal=(timer/10)%10  →  "12.3"
-// Patched:   integer=timer/100, decimal=timer%100        →  "12.34"
+// 1-digit:  integer=timer/100, decimal=(timer/10)%10 → "12.3"
+// 2-digit:  integer=timer/100, decimal=timer%100     → "12.34"
 //
-// Patches 14 sites across 6 functions:
-//   ArenaBoard_Render (0x421910)  — arena timer
-//   FUN_0041b710 (0x41b710)      — race HUD timer
-//   FUN_0041bfd0 (0x41bfd0)       — split-screen timer (2 sites)
-//   FUN_0044cd10 (0x44cd10)       — time trial results (2 sites)
-//   FUN_0044df70 (0x44df70)       — race results (6 sites)
-//   TourneyMenu_Render            — tournament menu (2 sites)
+// Patches 14 sites across 6 functions. Each site has two patches:
+// 1. Format string PUSH: ".%.1d" (0x4D03F0) ↔ ".%.2d" (DLL-local string)
+// 2. Computation (27 bytes): (timer/10)%10 ↔ timer%100
 //
-// Each site has two patches:
-//   1. Format string PUSH: change ".%.1d" → ".%.2d" (custom string in DLL)
-//   2. Computation (27 bytes): change (timer/10)%10 → timer%100
-//
-// Three register variants:
-//   ECX → MOV EAX,ECX (8B C1) — 11 sites
-//   EDI → MOV EAX,EDI (8B C7) — 2 sites
-//   EBP → MOV EAX,EBP (8B C5) — 1 site
+// Three register variants: ECX=0xC1, EDI=0xC7, EBP=0xC5
 // ============================================================================
 
 struct PatchSite {
     DWORD computeAddr;
     DWORD fmtPushAddr;
-    unsigned char movReg;  // 0xC1=ECX, 0xC7=EDI, 0xC5=EBP
+    unsigned char movReg; // 0xC1=ECX, 0xC7=EDI, 0xC5=EBP
     const char* desc;
 };
 
 class TimerPrecision : public HamsterballAPI {
 private:
     IModAPI* api = nullptr;
+    bool g_initialized = false;
 
-    // Custom format string in DLL memory (referenced by patched PUSH instructions)
     static const char* s_decimalFmt2;
-
     static constexpr int NUM_PATCHES = 14;
     static const PatchSite s_patches[NUM_PATCHES];
 
-    static void applyPatches(IModAPI* api) {
-        DWORD fmtAddr = (DWORD)s_decimalFmt2;
+    static void applyMode(IModAPI* api, bool twoDigits) {
+        DWORD fmtAddr = twoDigits ? (DWORD)s_decimalFmt2 : 0x004D03F0;
 
-        // Build the 5-byte PUSH instruction for our custom format string
         unsigned char fmtPush[5] = { 0x68, 0, 0, 0, 0 };
         memcpy(&fmtPush[1], &fmtAddr, 4);
 
@@ -55,22 +42,33 @@ private:
             const PatchSite& p = s_patches[i];
 
             // Patch 1: Format string PUSH (5 bytes)
-            // Original: PUSH 0x4D03F0 (".%.1d")
-            // Patched:  PUSH <s_decimalFmt2> (".%.2d")
             api->PatchMemory(p.fmtPushAddr, (const char*)fmtPush, 5);
 
             // Patch 2: Computation (27 bytes)
-            // Original: (timer/10)%10 via magic multiply 0x66666667 + IDIV 10
-            // Patched:  timer%100 via direct IDIV 100
-            unsigned char compute[27] = {
-                0x8B, p.movReg,                       // MOV EAX,<timer_reg>
-                0x99,                                  // CDQ
-                0xB9, 0x64, 0x00, 0x00, 0x00,          // MOV ECX,100
-                0xF7, 0xF1,                            // DIV ECX (EDX=timer%100)
-                0x90, 0x90, 0x90, 0x90, 0x90, 0x90,    // NOP *17
-                0x90, 0x90, 0x90, 0x90, 0x90, 0x90,
-                0x90, 0x90, 0x90, 0x90, 0x90
-            };
+            unsigned char compute[27];
+            memset(compute, 0x90, 27); // fill with NOPs
+
+            compute[0] = 0x8B; compute[1] = p.movReg; // MOV EAX,<reg>
+            compute[2] = 0x99;                         // CDQ
+
+            if (twoDigits) {
+                // timer % 100 via unsigned DIV
+                // Result in EDX = timer % 100 (2-digit decimal display)
+                compute[3] = 0xB9; compute[4] = 0x64; compute[5] = 0x00;
+                compute[6] = 0x00; compute[7] = 0x00;   // MOV ECX,100
+                compute[8] = 0xF7; compute[9] = 0xF1;   // DIV ECX → EDX=timer%100
+                // remaining 17 bytes already NOP
+            }
+            else {
+                // (timer/10)%10 via two IDIVs
+                // Result in EDX = (timer/10)%10 (1-digit decimal display)
+                compute[3] = 0xB9; compute[4] = 0x0A; compute[5] = 0x00;
+                compute[6] = 0x00; compute[7] = 0x00;   // MOV ECX,10
+                compute[8] = 0xF7; compute[9] = 0xF9;    // IDIV ECX → EAX=timer/10
+                compute[10] = 0x99;                        // CDQ (sign-extend EAX)
+                compute[11] = 0xF7; compute[12] = 0xF9;   // IDIV ECX → EDX=(timer/10)%10
+                // remaining 14 bytes already NOP
+            }
             api->PatchMemory(p.computeAddr, (const char*)compute, 27);
         }
     }
@@ -89,11 +87,18 @@ public:
         btn.falseText = "1";
         btn.defaultState = true;
         api->CreateToggleButton(btn, this);
-        applyPatches(api);
+    }
+
+    void onGameUpdate() override {
+        if (g_initialized) return;
+        g_initialized = true;
+        bool twoDigits = api->GetButtonState("timer_precision");
+        applyMode(api, twoDigits);
     }
 
     void onButtonToggle(const char* id, bool state) override {
-        // Patches applied at init; toggle is visual-only for now.
+        if (strcmp(id, "timer_precision") != 0) return;
+        applyMode(api, state);
     }
 };
 
