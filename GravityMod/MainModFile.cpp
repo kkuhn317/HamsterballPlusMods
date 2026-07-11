@@ -64,12 +64,10 @@ public:
             phys->gravity_y = (slider < 0) ? 1.0f : -1.0f;
         }
 
-        // Yeah its called spin rate in the api for some reason,
-        // but it really is a gravity scale property.
-        // It doesn't behave well with negative values,
+        // This doesn't behave well with negative values,
         // but it works much better with large values than the physics object gravity.
         // The default of it is 5.
-        ball->spin_rate = fabsf(slider);
+        ball->gravity_magnitude = fabsf(slider);
     }
 };
 

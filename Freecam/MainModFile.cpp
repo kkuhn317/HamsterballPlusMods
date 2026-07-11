@@ -120,7 +120,7 @@ public:
         api->RegisterCustomHook(0x45DAB0, (void*)hook_SpriteDrawRotatedQuad, (void**)&orig_SpriteDrawRotatedQuad);
         api->RegisterCustomHook(0x455D60, (void*)hook_GraphicsDrawScreenRect, (void**)&orig_GraphicsDrawScreenRect);
         api->RegisterCustomHook(0x45D450, (void*)hook_SpriteDrawExtended, (void**)&orig_SpriteDrawExtended);
-        printf("[FreeCam] Ready. F7=toggle cam, F8=toggle UI\n");
+        printf("[FreeCam] Ready. F7=toggle cam, F8=toggle UI, F9=toggle player, F10=toggle fog\n");
     }
 
     void onGameUpdate() override {

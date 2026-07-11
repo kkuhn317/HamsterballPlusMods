@@ -106,12 +106,14 @@ private:
     volatile bool m_running = true;
     bool m_cavesInstalled = false;
 
-    void createColorSlider(const char* id, const char* label, float defaultVal) {
+    void createColorSlider(const char* id, const char* label, float defaultVal, Color slideColor) {
         CustomSlider s(id, label, defaultVal);
         s.lowerBound = 0.0f;
         s.upperBound = 1.0f;
         s.stepSize = 0.05f;
         s.decimalPlaces = 2;
+        s.color = slideColor;
+        s.submenuID = "PLAYERCOLORS";
         api->CreateSlider(s, this);
     }
 
@@ -242,18 +244,30 @@ public:
     void Initialize(IModAPI* modApi) override {
         api = modApi;
 
-        createColorSlider("TINT_P1_R", "P1 Red", 1.0f);
-        createColorSlider("TINT_P1_G", "P1 Green", 1.0f);
-        createColorSlider("TINT_P1_B", "P1 Blue", 1.0f);
-        createColorSlider("TINT_P2_R", "P2 Red", 0.0f);
-        createColorSlider("TINT_P2_G", "P2 Green", 0.5f);
-        createColorSlider("TINT_P2_B", "P2 Blue", 1.0f);
-        createColorSlider("TINT_P3_R", "P3 Red", 1.0f);
-        createColorSlider("TINT_P3_G", "P3 Green", 0.25f);
-        createColorSlider("TINT_P3_B", "P3 Blue", 0.25f);
-        createColorSlider("TINT_P4_R", "P4 Red", 1.0f);
-        createColorSlider("TINT_P4_G", "P4 Green", 1.0f);
-        createColorSlider("TINT_P4_B", "P4 Blue", 0.0f);
+        CustomSubmenu colorMenu;
+        colorMenu.id = "PLAYERCOLORS";
+        colorMenu.color = Color(1.00f, 0.350f, 0.350f, 1.f);
+        colorMenu.displayText = "PLAYER COLORS";
+
+        api->CreateSubmenu(colorMenu);
+
+        Color p1SlideColor(1.f, 1.f, 1.f, 1.f);
+        Color p2SlideColor(0.350f, 0.707f, 1.00f, 1.f);
+        Color p3SlideColor(1.00f, 0.350f, 0.350f, 1.f);
+        Color p4SlideColor(0.989f, 1.00f, 0.310f, 1.f);
+
+        createColorSlider("TINT_P1_R", "P1 Red", 1.0f, p1SlideColor);
+        createColorSlider("TINT_P1_G", "P1 Green", 1.0f, p1SlideColor);
+        createColorSlider("TINT_P1_B", "P1 Blue", 1.0f, p1SlideColor);
+        createColorSlider("TINT_P2_R", "P2 Red", 0.0f, p2SlideColor);
+        createColorSlider("TINT_P2_G", "P2 Green", 0.5f, p2SlideColor);
+        createColorSlider("TINT_P2_B", "P2 Blue", 1.0f, p2SlideColor);
+        createColorSlider("TINT_P3_R", "P3 Red", 1.0f, p3SlideColor);
+        createColorSlider("TINT_P3_G", "P3 Green", 0.25f, p3SlideColor);
+        createColorSlider("TINT_P3_B", "P3 Blue", 0.25f, p3SlideColor);
+        createColorSlider("TINT_P4_R", "P4 Red", 1.0f, p4SlideColor);
+        createColorSlider("TINT_P4_G", "P4 Green", 1.0f, p4SlideColor);
+        createColorSlider("TINT_P4_B", "P4 Blue", 0.0f, p4SlideColor);
 
         m_thread = CreateThread(NULL, 0, tintThread, this, 0, NULL);
     }

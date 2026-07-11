@@ -129,7 +129,7 @@ public:
 
             std::string fpsStr = "FPS: " + std::to_string(currentFps);
 
-            fpsDisplay.x = fpsStr.length() * 4;
+            fpsDisplay.x = 800 - (fpsStr.length() * 4);
             fpsDisplay.y = 0;
 
             api->DrawCustomText(fpsStr.c_str(), fpsDisplay);
