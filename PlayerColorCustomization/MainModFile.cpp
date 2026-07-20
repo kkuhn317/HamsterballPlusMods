@@ -244,10 +244,7 @@ public:
     void Initialize(IModAPI* modApi) override {
         api = modApi;
 
-        CustomSubmenu colorMenu;
-        colorMenu.id = "PLAYERCOLORS";
-        colorMenu.color = Color(1.00f, 0.350f, 0.350f, 1.f);
-        colorMenu.displayText = "PLAYER COLORS";
+        CustomSubmenu colorMenu("PLAYERCOLORS", "PLAYER COLORS", Color(1.00f, 0.350f, 0.350f, 1.f));
 
         api->CreateSubmenu(colorMenu);
 
